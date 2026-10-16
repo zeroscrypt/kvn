@@ -2,12 +2,12 @@
 # Fetch and verify the pinned Xray-core release (pin: core/xray.json).
 #
 # Usage:
-#   scripts/fetch-xray.sh                  # .tools/xray-<platform>/xray for this host
+#   scripts/fetch-xray.sh                  # .tools/xray-<platform>/xray[.exe] for this host
 #   scripts/fetch-xray.sh --tools [target] # target = platform tag or "all"
 #   scripts/fetch-xray.sh --bundle [triple]# sidecar binary for `tauri build`
 #
 # Modes:
-#   --tools   local runs and tests: result in .tools/xray-<platform>/ (gitignored)
+#   --tools   local runs and tests: result in .tools/xray-<platform>/xray[.exe] (gitignored)
 #   --bundle  the binary Tauri `externalBin` expects:
 #             apps/desktop/src-tauri/binaries/xray-<triple>[.exe] (gitignored)
 #
@@ -122,6 +122,13 @@ fetch_one() { # <platform-tag-or-triple> <dest-file>
   echo "✓ $2"
 }
 
+tools_dest() { # <platform-tag> → where the extracted engine lands for tests
+  case "$1" in
+    windows-*) echo ".tools/xray-$1/xray.exe" ;;
+    *) echo ".tools/xray-$1/xray" ;;
+  esac
+}
+
 case "${1:-}" in
   --bundle)
     triple="${2:-$(host_triple)}"
@@ -136,14 +143,14 @@ case "${1:-}" in
     if [[ "$target" == "all" ]]; then
       "$PY" -c 'import json; [print(a["platform"]) for a in json.load(open("core/xray.json"))["assets"]]' |
         while IFS= read -r platform; do
-          fetch_one "$platform" ".tools/xray-${platform}/xray"
+          fetch_one "$platform" "$(tools_dest "$platform")"
         done
     else
-      fetch_one "$target" ".tools/xray-${target}/xray"
+      fetch_one "$target" "$(tools_dest "$target")"
     fi
     ;;
   "")
-    fetch_one "$(host_platform)" ".tools/xray-$(host_platform)/xray"
+    fetch_one "$(host_platform)" "$(tools_dest "$(host_platform)")"
     ;;
   *)
     die "unknown argument: $1 (see usage at the top of scripts/fetch-xray.sh)"
