@@ -61,6 +61,13 @@ kvn-engine` pins the engine explicitly.
 
 ## Releasing
 
+KVN is developed trunk-based: `main` is the only long-lived branch and
+every change lands there through a short-lived PR. There is no long-lived
+`develop` branch — the release PR that release-plz keeps open *is* the
+staging area. It accumulates the changes for the next version and is
+merged when a maintainer decides the release is ready; until then,
+development simply continues on `main`.
+
 Releases are automated: merge conventional commits to `main`,
 release-plz opens the release PR, merging it tags the release and
 creates a *draft* GitHub release; `.github/workflows/release.yml` builds
