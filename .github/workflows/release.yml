@@ -4,12 +4,19 @@ name: Release
 # Every asset is built from the tagged commit, attested with GitHub build
 # provenance, and attached to a *draft* release — publishing the draft is
 # the promotion step, so the published bytes are exactly the reviewed ones.
-# Stable releases created by release-please are drafts too (see
-# release-please-config.json), and this workflow attaches the binaries.
+# Draft releases (and their `vX.Y.Z` tags) are created by release-plz when a
+# release PR is merged; because a `GITHUB_TOKEN` tag push does not trigger
+# workflows, the release-plz workflow dispatches this one with `tag=<tag>`.
 
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build assets for (e.g. v0.1.0)"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -51,6 +58,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
@@ -107,8 +116,12 @@ jobs:
     name: Attach assets to draft release
     needs: build
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
 
       - name: Download all artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -124,13 +137,13 @@ jobs:
               print(tomllib.load(fh)["workspace"]["package"]["version"])
           PY
           )"
-          base="${GITHUB_REF_NAME#v}"
+          base="${TAG#v}"
           base="${base%%-*}"
           if [ "$base" != "$version" ]; then
-            echo "::error::tag ${GITHUB_REF_NAME} does not match workspace version ${version}"
+            echo "::error::tag ${TAG} does not match workspace version ${version}"
             exit 1
           fi
-          echo "tag ${GITHUB_REF_NAME} matches ${version}"
+          echo "tag ${TAG} matches ${version}"
 
       - name: Checksums and build info
         run: |
@@ -138,7 +151,7 @@ jobs:
           find . -type f ! -name SHA256SUMS ! -name build-info.json -print0 \
             | sort -z | xargs -0 sha256sum | sed 's|  \./|  |' > SHA256SUMS
           cat SHA256SUMS
-          python3 - "$GITHUB_REF_NAME" "$GITHUB_SHA" <<'PY'
+          python3 - "$TAG" "$(git rev-parse HEAD)" <<'PY'
           import datetime, json, sys
           tag, commit = sys.argv[1], sys.argv[2]
           info = {
@@ -158,10 +171,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="${GITHUB_REF_NAME}"
+          tag="${TAG}"
           files="$(find artifacts -type f | sort)"
           if gh release view "$tag" >/dev/null 2>&1; then
-            # release-please already created the (draft) release: attach.
+            # release-plz already created the (draft) release: attach.
             # shellcheck disable=SC2086
             gh release upload "$tag" $files --clobber
           else

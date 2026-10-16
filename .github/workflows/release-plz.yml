@@ -1,0 +1,118 @@
+name: Release-plz
+
+# release-plz keeps versions honest: once conventional commits land on main it
+# opens a release PR that bumps the workspace version and updates Cargo.lock
+# and CHANGELOG.md. Merging that PR creates the `vX.Y.Z` tag and a *draft*
+# GitHub release; the Release workflow in `release.yml` builds the assets and
+# attaches them to that draft. Because tags created with a `GITHUB_TOKEN` do
+# not trigger workflows, the dispatch job below starts `release.yml`
+# explicitly via `workflow_dispatch`.
+#
+# Configuration: release-plz.toml · Docs: https://release-plz.dev
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  release:
+    name: Tag and draft release
+    if: github.repository_owner == 'zeroscrypt'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    outputs:
+      releases: ${{ steps.release-plz.outputs.releases }}
+      releases_created: ${{ steps.release-plz.outputs.releases_created }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Run release-plz release
+        id: release-plz
+        uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5
+        with:
+          command: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  release-pr:
+    name: Open/update release PR
+    if: github.repository_owner == 'zeroscrypt'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    concurrency:
+      group: release-plz-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Run release-plz release-pr
+        uses: release-plz/action@8921286633dfa0c4020f7f30bd1c14fe19cbb10e # v0.5
+        with:
+          command: release-pr
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dispatch-artifacts:
+    name: Dispatch the artifact build
+    needs: release
+    if: needs.release.outputs.releases_created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Dispatch release.yml for each new tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASES: ${{ needs.release.outputs.releases }}
+        run: |
+          tags="$(printf '%s' "$RELEASES" | python3 -c '
+          import json, os
+          data = json.loads(os.environ.get("RELEASES") or "null")
+          if isinstance(data, dict):
+              releases = data.get("releases") or []
+          elif isinstance(data, list):
+              releases = data
+          else:
+              releases = []
+          seen = []
+          for release in releases:
+              tag = release.get("tag") if isinstance(release, dict) else None
+              if tag and tag not in seen:
+                  seen.append(tag)
+          print("\n".join(seen))
+          ')"
+          dispatch=0
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            echo "dispatching release.yml for $tag"
+            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" -f "tag=$tag"
+            dispatch=$((dispatch + 1))
+          done <<< "$tags"
+          if [ "$dispatch" -eq 0 ]; then
+            echo "::warning::release-plz reported a release but no tag was found in its output"
+          fi

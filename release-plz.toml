@@ -1,0 +1,52 @@
+# release-plz drives versioning: it opens a release PR that bumps the
+# workspace version and updates Cargo.lock, and — once that PR is merged —
+# creates the `vX.Y.Z` tag and a *draft* GitHub release. Build artifacts are
+# attached to that draft by .github/workflows/release.yml; publishing the
+# draft is the promotion step.
+#
+# Docs: https://release-plz.dev/docs
+
+[workspace]
+repo_url = "https://github.com/zeroscrypt/kvn"
+
+# Nothing is published to crates.io; releases are git tags + GitHub releases.
+publish = false
+
+# Version baselines come from git tags, not from a crate registry.
+git_only = true
+
+# The whole workspace shares one version (`[workspace.package].version`), and
+# the product is a single app: one tag and one release per version.
+git_tag_name = "v{{ version }}"
+git_release_name = "v{{ version }}"
+
+# Assets land in the release draft before a human publishes it.
+git_release_draft = true
+
+# Only release commits that reached main through a merged release PR
+# (avoids tagging arbitrary pushes).
+release_always = false
+
+# Internal plumbing crates: versioned in lockstep with the product, but the
+# tag and the draft release are created only by kvn-desktop. Their changelog
+# entries land in the root CHANGELOG.md through `changelog_include` below.
+[[package]]
+name = "kvn-core"
+changelog_update = false
+git_tag_enable = false
+git_release_enable = false
+version_group = "kvn"
+
+[[package]]
+name = "kvn-engine"
+changelog_update = false
+git_tag_enable = false
+git_release_enable = false
+version_group = "kvn"
+
+# The product: one changelog for the whole app, at the repository root.
+[[package]]
+name = "kvn-desktop"
+changelog_path = "CHANGELOG.md"
+changelog_include = ["kvn-core", "kvn-engine"]
+version_group = "kvn"

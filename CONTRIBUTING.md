@@ -62,8 +62,22 @@ kvn-engine` pins the engine explicitly.
 ## Releasing
 
 Releases are automated: merge conventional commits to `main`,
-release-please opens the release PR, merging it tags the release and
+release-plz opens the release PR, merging it tags the release and
 creates a *draft* GitHub release; `.github/workflows/release.yml` builds
 attested artifacts for all platforms into that draft, and publishing the
 draft is the promotion step (the published bytes are exactly the built
 ones). Maintainers do this; nothing to do in normal contributions.
+
+Notes for maintainers:
+
+- The release PR is opened with the repository `GITHUB_TOKEN`, so GitHub
+  does not trigger CI on it and the `ci-gate` check never reports; merge it
+  with the ruleset bypass. The PR contains only the version bump, the
+  regenerated `Cargo.lock` and the `CHANGELOG.md` entry produced by
+  release-plz.
+- Merging the release PR makes release-plz create the tag and the draft
+  release and dispatch `release.yml` for that tag. If the automatic
+  dispatch ever fails, rebuild manually with
+  `gh workflow run release.yml -f tag=vX.Y.Z`.
+- Once the draft has all platform assets (roughly 30–40 minutes), review
+  the checksums and publish the draft.
