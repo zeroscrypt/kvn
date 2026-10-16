@@ -126,9 +126,7 @@ const ru = {
 
   // ------------------------------------------------------ subscriptions ----
   "subs.label": "Подписки",
-  "subs.namePlaceholder": "имя",
   "subs.urlPlaceholder": "https://…/sub/…",
-  "subs.nameAria": "Имя подписки",
   "subs.urlAria": "URL подписки",
   "subs.add": "Добавить и загрузить",
   "subs.adding": "Загрузка…",
@@ -361,9 +359,7 @@ const en: Record<StringKey, string> = {
   "import.result": "added {added}, replaced {replaced}, failed {failed}",
 
   "subs.label": "Subscriptions",
-  "subs.namePlaceholder": "name",
   "subs.urlPlaceholder": "https://…/sub/…",
-  "subs.nameAria": "Subscription name",
   "subs.urlAria": "Subscription URL",
   "subs.add": "Add + fetch",
   "subs.adding": "Fetching…",
