@@ -69,8 +69,15 @@ jobs:
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
-        with:
-          targets: ${{ matrix.triple }}
+
+      - name: Install the Rust target for this bundle
+        shell: bash
+        run: |
+          # rust-toolchain.toml pins the toolchain cargo will use, so install
+          # that toolchain and the matrix target explicitly (the action above
+          # installs targets for `stable`, a different toolchain).
+          rustup install --profile minimal --no-self-update
+          rustup target add "${{ matrix.triple }}"
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
