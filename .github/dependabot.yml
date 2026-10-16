@@ -1,3 +1,6 @@
+# Dependency updates land as small grouped PRs. Major versions are planned
+# deliberately (release notes, migration, live tests), so automated PRs are
+# limited to minor/patch; remove an `ignore` block to surface majors again.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -11,6 +14,9 @@ updates:
       cargo-minor:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /apps/desktop
@@ -23,6 +29,9 @@ updates:
       npm-minor:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
