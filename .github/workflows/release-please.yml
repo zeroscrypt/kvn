@@ -1,0 +1,23 @@
+name: Release Please
+
+# Continuous releases: merges to main accumulate into a release PR with
+# generated notes and version bumps. Merging that PR tags the release and
+# creates a *draft* GitHub release, which `release.yml` fills with attested
+# binaries; publishing the draft is the promotion step.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

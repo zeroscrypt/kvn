@@ -1,0 +1,34 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+    paths: ["crates/**", "apps/desktop/src-tauri/src/**", ".github/workflows/codeql.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["crates/**", "apps/desktop/src-tauri/src/**", ".github/workflows/codeql.yml"]
+  schedule:
+    - cron: "30 5 * * 3"
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    name: Analyze Rust
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3
+        with:
+          languages: rust
+          build-mode: none
+          queries: security-extended
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@ce5e7eeac396d720fe2d802714996c8ce561e311 # v3

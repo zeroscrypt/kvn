@@ -1,0 +1,172 @@
+name: Release
+
+# Tag-driven releases: `git tag -s v0.1.0-rc.1 && git push origin v0.1.0-rc.1`.
+# Every asset is built from the tagged commit, attested with GitHub build
+# provenance, and attached to a *draft* release — publishing the draft is
+# the promotion step, so the published bytes are exactly the reviewed ones.
+# Stable releases created by release-please are drafts too (see
+# release-please-config.json), and this workflow attaches the binaries.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            os: macos-14
+            args: --target aarch64-apple-darwin --bundles dmg
+            artifacts: |
+              target/**/release/bundle/dmg/*.dmg
+          - platform: macos-x64
+            os: macos-13
+            args: --target x86_64-apple-darwin --bundles dmg
+            artifacts: |
+              target/**/release/bundle/dmg/*.dmg
+          - platform: linux-x64
+            os: ubuntu-22.04
+            args: --bundles deb,appimage
+            artifacts: |
+              target/**/release/bundle/deb/*.deb
+              target/**/release/bundle/appimage/*.AppImage
+          - platform: windows-x64
+            os: windows-latest
+            args: --bundles nsis,msi
+            artifacts: |
+              target/**/release/bundle/nsis/*.exe
+              target/**/release/bundle/msi/*.msi
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+
+      - name: Install Linux system dependencies (WebKitGTK)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+        with:
+          version: 10
+
+      - name: Install Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+
+      - name: Build frontend
+        working-directory: apps/desktop
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build
+
+      - name: Fetch pinned Xray sidecar
+        shell: bash
+        run: ./scripts/fetch-xray.sh --bundle
+
+      - name: Build bundles
+        working-directory: apps/desktop
+        run: pnpm tauri build ${{ matrix.args }}
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: ${{ matrix.artifacts }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.platform }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Attach assets to draft release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Verify the tag matches the workspace version
+        run: |
+          version="$(python3 - <<'PY'
+          import tomllib
+          with open("Cargo.toml", "rb") as fh:
+              print(tomllib.load(fh)["workspace"]["package"]["version"])
+          PY
+          )"
+          base="${GITHUB_REF_NAME#v}"
+          base="${base%%-*}"
+          if [ "$base" != "$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match workspace version ${version}"
+            exit 1
+          fi
+          echo "tag ${GITHUB_REF_NAME} matches ${version}"
+
+      - name: Checksums and build info
+        run: |
+          cd artifacts
+          find . -type f ! -name SHA256SUMS ! -name build-info.json -print0 \
+            | sort -z | xargs -0 sha256sum | sed 's|  \./|  |' > SHA256SUMS
+          cat SHA256SUMS
+          python3 - "$GITHUB_REF_NAME" "$GITHUB_SHA" <<'PY'
+          import datetime, json, sys
+          tag, commit = sys.argv[1], sys.argv[2]
+          info = {
+              "tag": tag,
+              "commit": commit,
+              "version": tag.lstrip("v").split("-")[0],
+              "created_utc": datetime.datetime.now(datetime.timezone.utc)
+              .strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "engine_pin": "see core/xray.json",
+              "signing": "unsigned build (no Apple Developer certificate); "
+              "provenance attestation via actions/attest-build-provenance",
+          }
+          json.dump(info, open("build-info.json", "w"), indent=2)
+          PY
+
+      - name: Attach assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          files="$(find artifacts -type f | sort)"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # release-please already created the (draft) release: attach.
+            # shellcheck disable=SC2086
+            gh release upload "$tag" $files --clobber
+          else
+            prerelease=""
+            case "$tag" in *-rc*|*-alpha*|*-beta*) prerelease="--prerelease" ;; esac
+            # shellcheck disable=SC2086
+            gh release create "$tag" --draft --title "$tag" --generate-notes $prerelease $files
+          fi

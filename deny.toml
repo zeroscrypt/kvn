@@ -1,0 +1,57 @@
+# cargo-deny configuration — https://embarkstudios.github.io/cargo-deny/
+#
+# Run locally with `cargo deny check advisories bans licenses sources`;
+# CI runs the same check on every pull request.
+
+[graph]
+targets = [
+  { triple = "aarch64-apple-darwin" },
+  { triple = "x86_64-apple-darwin" },
+  { triple = "x86_64-unknown-linux-gnu" },
+  { triple = "aarch64-unknown-linux-gnu" },
+  { triple = "x86_64-pc-windows-msvc" },
+]
+
+[advisories]
+version = 2
+yanked = "deny"
+# Both advisories are unsoundness reports for `glib` 0.18, pulled in only on
+# Linux through the GTK/WebKitGTK stack Tauri uses for the system webview.
+# KVN's own code never touches the affected iterator adapters, and the crate
+# is not part of macOS or Windows builds at all. Re-evaluate on every Tauri
+# upgrade that moves the GTK stack forward.
+ignore = [
+  { id = "RUSTSEC-2024-0370", reason = "glib unsoundness — Linux GTK3 stack only, not reachable from KVN code" },
+  { id = "RUSTSEC-2024-0429", reason = "glib unsoundness — Linux GTK3 stack only, not reachable from KVN code" },
+]
+
+[licenses]
+version = 2
+confidence-threshold = 0.9
+allow = [
+  "0BSD",
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC0-1.0",
+  "CDLA-Permissive-2.0",
+  "ISC",
+  "MIT",
+  "MIT-0",
+  "MPL-2.0",
+  "Unicode-3.0",
+  "Unicode-DFS-2016",
+  "Unlicense",
+  "Zlib",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+# Workspace-internal path dependencies are intentionally versionless.
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

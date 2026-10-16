@@ -1,0 +1,58 @@
+name: Core update check
+
+# Watches XTLS/Xray-core releases and opens a bump PR against core/xray.json
+# when a newer release appears (ADR 0005). The PR refreshes the pinned
+# digests from the release `.dgst` files; review, CI and release handle the
+# rest. Engine upgrades never reach users without a regular KVN release.
+
+on:
+  schedule:
+    - cron: "23 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Compare pin with upstream
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Check upstream release
+        id: upstream
+        run: |
+          latest="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/XTLS/Xray-core/releases/latest \
+            | python3 -c 'import json,sys; print(json.load(sys.stdin)["tag_name"])')"
+          pinned="$(python3 -c 'import json; print(json.load(open("core/xray.json"))["release"])')"
+          echo "pinned=$pinned latest=$latest"
+          if [ "$latest" != "$pinned" ]; then
+            echo "update=$latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Refresh pin
+        if: steps.upstream.outputs.update != ''
+        run: python3 scripts/update-core-pin.py "${{ steps.upstream.outputs.update }}"
+
+      - name: Open pull request
+        if: steps.upstream.outputs.update != ''
+        uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7
+        with:
+          commit-message: "chore(core): pin Xray-core ${{ steps.upstream.outputs.update }}"
+          signoff: true
+          branch: chore/core-update
+          delete-branch: true
+          title: "chore(core): pin Xray-core ${{ steps.upstream.outputs.update }}"
+          body: |
+            Automated by `.github/workflows/core-update.yml`.
+
+            Upstream published `${{ steps.upstream.outputs.update }}`; this PR
+            refreshes the digests in `core/xray.json` from the official
+            `.dgst` files. Once merged, the next KVN release ships the new
+            engine; the in-app check in Settings starts reporting the new
+            pinned version.
+          labels: |
+            dependencies
+            engine
