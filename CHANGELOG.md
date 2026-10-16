@@ -46,7 +46,7 @@ Windows собираются из того же кода (не проверен�
   шрифт Geist Mono (OFL-1.1) — в комплекте.
 - **Релиз-инженерия**: CI на macOS/Linux/Windows (юнит- и живые
   интеграционные тесты, `fmt`, `clippy -D warnings`, `cargo-deny`,
-  conventional-commit + DCO), release-please для версий, тег → сборка →
+  conventional-commit + DCO), release-plz для версий, тег → сборка →
   provenance-аттестации + `SHA256SUMS` в черновик релиза (публикация без
   пересборки); CodeQL, OpenSSF Scorecard, Dependabot; все actions
   пришпилены к commit-SHA.

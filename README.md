@@ -151,7 +151,7 @@ conventional-commit/DCO. Все цифры тестов и замеров — в
 Тег (`v0.1.0`) → сборка на всех платформах в GitHub Actions → артефакты
 с build-provenance аттестацией и `SHA256SUMS` прикладываются к **черновику**
 релиза; публикация черновика — это и есть выпуск (байты не пересобираются).
-Версии ведёт release-please по Conventional Commits, пин движка обновляет
+Версии ведёт release-plz по Conventional Commits, пин движка обновляет
 `core-update.yml` отдельным проверяемым PR.
 
 ## Структура
