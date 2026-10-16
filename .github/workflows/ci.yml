@@ -42,13 +42,13 @@ jobs:
           case "$RUNNER_OS" in
             macOS)
               if [[ "$(uname -m)" == "arm64" ]]; then
-                export XRAY_BIN="$PWD/.tools/xray-macos-arm64/xray"
+                export XRAY_BIN="$GITHUB_WORKSPACE/.tools/xray-macos-arm64/xray"
               else
-                export XRAY_BIN="$PWD/.tools/xray-macos-amd64/xray"
+                export XRAY_BIN="$GITHUB_WORKSPACE/.tools/xray-macos-amd64/xray"
               fi
               ;;
-            Linux) export XRAY_BIN="$PWD/.tools/xray-linux-amd64/xray" ;;
-            Windows) export XRAY_BIN="$PWD/.tools/xray-windows-amd64/xray.exe" ;;
+            Linux) export XRAY_BIN="$GITHUB_WORKSPACE/.tools/xray-linux-amd64/xray" ;;
+            Windows) export XRAY_BIN="$GITHUB_WORKSPACE/.tools/xray-windows-amd64/xray.exe" ;;
           esac
           cargo test -p kvn-core -p kvn-engine
 
@@ -187,15 +187,19 @@ jobs:
 
       - name: DCO sign-off (PRs)
         if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          git fetch --depth=1 origin "${{ github.base_ref }}"
+          # Range explicitly from base to head so GitHub's synthetic merge
+          # commit (refs/pull/N/merge) is never inspected.
           missing=0
           while IFS= read -r sha; do
             if ! git log -1 --pretty=%B "$sha" | grep -Eq '^Signed-off-by: .+ <.+@.+>'; then
               echo "::error::commit $sha has no Signed-off-by line (git commit -s)"
               missing=1
             fi
-          done < <(git rev-list "origin/${{ github.base_ref }}..HEAD")
+          done < <(git rev-list --no-merges "$BASE_SHA..$HEAD_SHA")
           exit "$missing"
 
   ci-gate:
