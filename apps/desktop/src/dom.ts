@@ -34,7 +34,7 @@ export function clear(node: HTMLElement): void {
 
 export function fmtBytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return "—";
-  if (n < 1024) return `${n} B`;
+  if (n < 1024) return `${Math.round(n)} B`;
   const units = ["KB", "MB", "GB", "TB"];
   let value = n / 1024;
   let idx = 0;
@@ -42,7 +42,8 @@ export function fmtBytes(n: number): string {
     value /= 1024;
     idx += 1;
   }
-  return `${value >= 100 ? value.toFixed(0) : value.toFixed(1)} ${units[idx]}`;
+  // Whole numbers only: fractional traffic values read as noise.
+  return `${Math.round(value)} ${units[idx]}`;
 }
 
 export function fmtRate(bytesPerSec: number): string {
@@ -62,11 +63,8 @@ export function fmtDuration(ms: number): string {
 
 export function fmtTime(tsMs: number): string {
   const d = new Date(tsMs);
-  const pad = (x: number, w = 2) => String(x).padStart(w, "0");
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}.${pad(
-    d.getMilliseconds(),
-    3,
-  )}`;
+  const pad = (x: number) => String(x).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** Format a port list for copyable text. */
