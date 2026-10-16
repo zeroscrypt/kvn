@@ -158,7 +158,8 @@ mod tests {
         assert!(extract_engine_binary(&zip_path, dir.path(), "deadbeef").is_err());
 
         let binary = extract_engine_binary(&zip_path, dir.path(), &digest).unwrap();
-        assert_eq!(binary.file_name().unwrap(), "xray");
+        let expected_name = if cfg!(windows) { "xray.exe" } else { "xray" };
+        assert_eq!(binary.file_name().unwrap(), expected_name);
         assert_eq!(std::fs::read(&binary).unwrap(), b"#!/bin/false\n");
         #[cfg(unix)]
         {
