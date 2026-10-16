@@ -1,0 +1,15 @@
+[package]
+name = "kvn-core"
+description = "Domain model, share-link parsing, Xray client config generation and connection state machine for KVN"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+percent-encoding = { workspace = true }
+uuid = { workspace = true }
