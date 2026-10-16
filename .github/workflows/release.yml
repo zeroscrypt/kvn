@@ -162,20 +162,23 @@ jobs:
 
       - name: Checksums and build info
         run: |
+          engine="$(python3 -c 'import json; print(json.load(open("core/xray.json"))["release"])')"
           cd artifacts
+          # Release assets are flat, so hash by basename: `sha256sum -c
+          # SHA256SUMS` must work for someone who just downloaded the files.
           find . -type f ! -name SHA256SUMS ! -name build-info.json -print0 \
-            | sort -z | xargs -0 sha256sum | sed 's|  \./|  |' > SHA256SUMS
+            | sort -z | xargs -0 sha256sum | sed -E 's|  .*/|  |' > SHA256SUMS
           cat SHA256SUMS
-          python3 - "$TAG" "$(git rev-parse HEAD)" <<'PY'
+          python3 - "$TAG" "$(git rev-parse HEAD)" "$engine" <<'PY'
           import datetime, json, sys
-          tag, commit = sys.argv[1], sys.argv[2]
+          tag, commit, engine = sys.argv[1], sys.argv[2], sys.argv[3]
           info = {
               "tag": tag,
               "commit": commit,
               "version": tag.lstrip("v").split("-")[0],
               "created_utc": datetime.datetime.now(datetime.timezone.utc)
               .strftime("%Y-%m-%dT%H:%M:%SZ"),
-              "engine_pin": "see core/xray.json",
+              "engine_pin": f"Xray-core {engine} (see core/xray.json)",
               "signing": "unsigned build (no Apple Developer certificate); "
               "provenance attestation via actions/attest-build-provenance",
           }
