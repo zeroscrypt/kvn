@@ -227,12 +227,24 @@ function setText(node: HTMLElement, text: string): void {
 }
 
 export function render(model: AppModel, handlers: ViewHandlers): void {
+  applyLayout(model);
   renderTopbar(model);
   renderSidebar(model, handlers);
   renderStatus(model, handlers);
   renderProfilePanel(model, handlers);
   renderEventsPanel(model);
   renderStatusbar(model);
+}
+
+/** Few profiles: the panel is a horizontal strip under the topbar (one
+ *  subscription should not cost a whole column). Beyond a handful it
+ *  returns to the left column. The threshold counts profile items — what
+ *  is actually displayed. */
+function applyLayout(model: AppModel): void {
+  const app = document.getElementById("app");
+  if (!app) return;
+  const layout = model.profiles.length > 4 ? "side" : "top";
+  if (app.dataset.layout !== layout) app.dataset.layout = layout;
 }
 
 function renderTopbar(model: AppModel): void {
@@ -284,11 +296,13 @@ function renderSidebar(model: AppModel, handlers: ViewHandlers): void {
   list.addEventListener("keydown", (e) => {
     const items = Array.from(list.querySelectorAll<HTMLButtonElement>(".profile-item"));
     const idx = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (e.key === "ArrowDown" && idx >= 0) {
-      items[Math.min(idx + 1, items.length - 1)]?.focus();
+    const next = (from: number, step: number) =>
+      items[Math.min(Math.max(from + step, 0), items.length - 1)]?.focus();
+    if ((e.key === "ArrowDown" || e.key === "ArrowRight") && idx >= 0) {
+      next(idx, 1);
       e.preventDefault();
-    } else if (e.key === "ArrowUp" && idx >= 0) {
-      items[Math.max(idx - 1, 0)]?.focus();
+    } else if ((e.key === "ArrowUp" || e.key === "ArrowLeft") && idx >= 0) {
+      next(idx, -1);
       e.preventDefault();
     }
   });

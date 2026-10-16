@@ -51,7 +51,9 @@ impl Default for Settings {
             sniffing: true,
             log_level: "warning".into(),
             test_mode: false,
-            system_proxy_desired: false,
+            // Routing system traffic through the tunnel is what "connected"
+            // means to a user: default it on, restore on disconnect.
+            system_proxy_desired: true,
             language: "ru".into(),
             engine_path: None,
         }

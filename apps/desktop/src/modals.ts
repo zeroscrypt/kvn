@@ -180,7 +180,6 @@ function renderSubscriptions(ctx: UiContext, host: HTMLElement): void {
   clear(host);
   host.append(el("label", { text: t("subs.label") }));
 
-  const nameInput = el("input", { placeholder: t("subs.namePlaceholder"), "aria-label": t("subs.nameAria") });
   const urlInput = el("input", {
     placeholder: t("subs.urlPlaceholder"),
     "aria-label": t("subs.urlAria"),
@@ -188,8 +187,7 @@ function renderSubscriptions(ctx: UiContext, host: HTMLElement): void {
   const addBtn = el("button", { class: "btn small", text: t("subs.add") });
   const status = el("div", { class: "note" });
 
-  addBtn.addEventListener("click", async () => {
-    const name = nameInput.value.trim();
+  const addNow = async () => {
     const url = urlInput.value.trim();
     if (!url) {
       status.textContent = t("subs.required");
@@ -198,9 +196,9 @@ function renderSubscriptions(ctx: UiContext, host: HTMLElement): void {
     addBtn.disabled = true;
     addBtn.textContent = t("subs.adding");
     try {
-      await api.subscriptionAdd(name || "subscription", url);
-      ctx.pushLocal("info", "subs", t("subs.addedLog", { name: name || url }));
-      nameInput.value = "";
+      const name = nameFromUrl(url);
+      await api.subscriptionAdd(name, url);
+      ctx.pushLocal("info", "subs", t("subs.addedLog", { name }));
       urlInput.value = "";
       await ctx.refreshProfiles();
       await renderSubscriptionsList(host);
@@ -212,17 +210,32 @@ function renderSubscriptions(ctx: UiContext, host: HTMLElement): void {
       addBtn.disabled = false;
       addBtn.textContent = t("subs.add");
     }
+  };
+
+  addBtn.addEventListener("click", () => void addNow());
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") void addNow();
   });
 
   host.append(
     el("div", { class: "field-row" }, [
-      el("div", { class: "grow-1" }, [nameInput]),
-      el("div", { class: "grow-2" }, [urlInput]),
+      el("div", { class: "grow-1" }, [urlInput]),
       addBtn,
     ]),
     status,
   );
   void renderSubscriptionsList(host);
+}
+
+/** A short human name for a subscription: its host, else a generic label. */
+function nameFromUrl(url: string): string {
+  try {
+    const host = new URL(url).hostname;
+    if (host) return host;
+  } catch {
+    /* not a URL: fall through */
+  }
+  return "subscription";
 }
 
 async function renderSubscriptionsList(host: HTMLElement): Promise<void> {

@@ -32,6 +32,9 @@
   --focus: #46c8d1;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --radius: 3px;
+  /* Native widgets (carets, selection popovers, fallback scrollbars)
+     follow the console's dark palette instead of macOS chrome. */
+  color-scheme: dark;
 }
 
 * {
@@ -96,6 +99,33 @@ textarea {
   background: var(--accent-dim);
 }
 
+/* ---------- scrollbars ----------
+   Default scrollbars are bright native chrome that stands out in the dark
+   console: replace them with a thin graphite thumb that reads as part of
+   the panel it belongs to. Applies to every scrollable surface (sidebar,
+   main column, event feed, dialogs, palette). */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(70, 200, 209, 0.45);
+  background-clip: padding-box;
+}
+
 /* ---------- layout ---------- */
 
 #app {
@@ -141,6 +171,65 @@ textarea {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+/* ---------- adaptive profiles panel ----------
+   A short list (the common case: one subscription) renders as a strip
+   under the topbar instead of a half-empty column. `views.ts` flips
+   `data-layout` once the list grows past the threshold. */
+#app[data-layout="top"] {
+  grid-template-areas:
+    "top"
+    "side"
+    "main"
+    "stat";
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto 1fr auto;
+}
+
+#app[data-layout="top"] .sidebar {
+  flex-direction: row;
+  align-items: center;
+  border-right: none;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+#app[data-layout="top"] .profiles-head {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  flex: 0 0 auto;
+  background: var(--bg-panel);
+  padding: 6px 10px 6px 12px;
+}
+
+#app[data-layout="top"] #profile-list-host {
+  flex: 0 0 auto;
+}
+
+#app[data-layout="top"] .profile-list {
+  display: flex;
+  gap: 6px;
+  padding: 6px 10px 6px 0;
+}
+
+#app[data-layout="top"] .profile-list > li {
+  flex: 0 0 auto;
+}
+
+#app[data-layout="top"] .profile-item {
+  margin-top: 0;
+  width: auto;
+  min-width: 170px;
+  max-width: 280px;
+}
+
+#app[data-layout="top"] .empty-note {
+  padding: 9px 12px;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .main {

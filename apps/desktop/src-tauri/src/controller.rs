@@ -110,6 +110,14 @@ impl Ctx {
             epoch: Some(epoch),
         });
     }
+
+    /// Facts about the real process (engine stopped / exited) are not tied
+    /// to a request generation: they must always reach the state machine.
+    /// Sent as scoped, an `EngineStopped` after the first epoch bump would
+    /// be dropped as stale and the machine would hang in `Stopping`.
+    fn send_fact(&self, ev: Event) {
+        let _ = self.tx.send(Msg { ev, epoch: None });
+    }
 }
 
 #[derive(Clone)]
@@ -160,12 +168,21 @@ impl Controller {
     }
 }
 
+/// Scoped events are dropped once their generation is no longer current;
+/// unscoped events (facts, user commands) always pass.
+fn event_is_current(msg_epoch: Option<u64>, current: u64) -> bool {
+    match msg_epoch {
+        Some(epoch) => epoch == current,
+        None => true,
+    }
+}
+
 async fn run_loop(ctx: Arc<Ctx>, mut rx: mpsc::UnboundedReceiver<Msg>) {
     let mut sm = StateMachine::new(RetryPolicy::default());
     let mut last_line = String::new();
     while let Some(msg) = rx.recv().await {
         if let Some(epoch) = msg.epoch {
-            if epoch != ctx.shared.epoch.load(Ordering::SeqCst) {
+            if !event_is_current(Some(epoch), ctx.shared.epoch.load(Ordering::SeqCst)) {
                 ctx.log.push(
                     "debug",
                     "state",
@@ -230,9 +247,9 @@ fn execute(ctx: &Arc<Ctx>, action: Action, state: &ConnectionState) {
             let ctx = Arc::clone(ctx);
             tauri::async_runtime::spawn(async move {
                 do_kill(&ctx).await;
-                ctx.send_scoped(Event::EngineStopped, 0);
-                // EngineStopped is intentionally *not* epoch-scoped: it
-                // reflects the actual process state, not a generation.
+                ctx.send_fact(Event::EngineStopped);
+                // A fact: the process is actually gone. It must never be
+                // dropped by the epoch guard, or `Stopping` never resolves.
             });
         }
         Action::RunHealthCheck => {
@@ -645,10 +662,10 @@ async fn watchdog(ctx: Arc<Ctx>) {
                     None => format!("engine process {pid} was terminated by a signal"),
                 },
             );
-            ctx.send_scoped(Event::EngineExited { code }, 0);
-            // EngineExited is intentionally not epoch-scoped: it is a fact
-            // about the actual process, and the state machine already
-            // ignores it in states where it makes no sense.
+            ctx.send_fact(Event::EngineExited { code });
+            // A fact about the actual process, not a request generation:
+            // the state machine ignores it in states where it makes no
+            // sense (e.g. during an intentional teardown).
         }
     }
 }
@@ -874,6 +891,17 @@ mod tests {
         let missing = log_tail(&[dir.join("nope.log")], 2);
         assert!(missing.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn unscoped_events_always_pass_but_stale_scopes_do_not() {
+        // Facts (EngineStopped / EngineExited) go unscoped and must pass.
+        assert!(event_is_current(None, 7));
+        assert!(event_is_current(Some(7), 7));
+        // The regression that hung `Stopping`: a scoped send with epoch 0
+        // while the connection was already on epoch 1.
+        assert!(!event_is_current(Some(0), 1));
+        assert!(!event_is_current(Some(6), 7));
     }
 
     #[test]
