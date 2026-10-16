@@ -1,2 +1,9 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Binary assets: no diffs, no EOL conversion
+*.png binary
+*.icns binary
+*.ico binary
+*.woff2 binary
+*.dmg binary

@@ -1,0 +1,27 @@
+# Rust
+/target
+**/*.rs.bk
+
+# Node
+node_modules/
+apps/desktop/dist/
+apps/desktop/src-tauri/gen/
+
+# Dev tools (local Xray binaries for testing, downloaded by scripts/fetch-xray.sh)
+/.tools
+
+# Sidecar engine binaries for bundling (scripts/fetch-xray.sh --bundle).
+# Platform-specific build inputs, never committed — see core/xray.json.
+apps/desktop/src-tauri/binaries/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
