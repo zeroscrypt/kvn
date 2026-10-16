@@ -1,0 +1,54 @@
+name: Bug report
+description: Something is broken — connection issues, crashes, wrong behaviour
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Do not paste subscription links, UUIDs,
+        server addresses or passwords** — redact them. Security issues:
+        see SECURITY.md instead of this form.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. …
+        2. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: KVN version
+      description: Settings → the version in the log, or the release tag you downloaded
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Windows
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Paste the output of "Export diagnostics" from Settings (it contains
+        no secrets), and any relevant lines from the event log panel.
+      render: text
+    validations:
+      required: false
